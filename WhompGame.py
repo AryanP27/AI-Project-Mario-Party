@@ -12,14 +12,36 @@
     - The offsets added in the second phase of the boss are calculated before decision making since we'll
     assume the players could calculate the trick themselves
 """
-# Wrap into a class later
-"""class WhompStomp():"""
 
 """ Imports """
 import random
 # need to import RL model
+# Import Ray RL Lib
+# Import tkinter
 
 """ Definitions """
+
+class WhompStomp():
+    def __init__(self):
+        self.state = self.init_state()
+        self.done = False
+
+    def reset(self):
+        self.state = self.init_state()
+        self.done = False
+        return self.state
+
+    def step(self, actions):
+        # Apply actions from multiple agents
+        rewards, next_state = self.update_state(actions)
+        self.state = next_state
+        return next_state, rewards, self.done
+
+    def render(self):
+        # Optional: visualize using Tkinter or matplotlib
+        pass
+    pass
+
 class Player():
     def __init__(self, type : int = 0, position : int = None, rngType : int = 0):
         self.type = type # 0 for random, 1 for human, 2 for AI
