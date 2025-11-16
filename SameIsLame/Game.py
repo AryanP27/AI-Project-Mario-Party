@@ -1,5 +1,5 @@
 """
-    SameIsLame.py
+    SameIsLame/Game.py
 
     This is a simulation of the game 'Same Is Lame' from Mario Party 6
 """
