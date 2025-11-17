@@ -17,7 +17,6 @@ import numpy as np
 
 # Reinforced Learning
 import torch
-import torch.optim as optim
 import torch.nn as nn
 import numpy as np
 from collections import deque
@@ -93,11 +92,98 @@ class QNetwork(nn.Module):
     def forward(self, x):
         return self.fc(x)
 
-def basePolicies():
-    p2 = random.choice([0,1,2,3])
-    p3 = random.choice([0,1])
-    p4 = 3
-    return p2, p3, p4
+class AgentPlayer():
+    def __init__(self, state_dim, action_dim, config : dict = {
+        "lr" : 1e-3, # Learning Rate
+        "gamma" : 0.99, # Discount Factor
+        "epsilon" : 1.0,
+        "epsilon_decay" : 0.995,
+        "epsilon_min" : 0.1,
+        "batch_size" : 32,
+        "buffer_size" : 10000,
+    }):
+        # Each player needs their own components
+
+        self.gamma = config["gamma"]
+        self.epsilon = config["epsilon"]
+        self.epsilon_decay = config["epsilon_decay"]
+        self.epsilon_min = config["epsilon_min"]
+        self.batch_size = config["batch_size"]
+
+        # Replay buffer
+        self.replay_buffer = deque(maxlen=config["buffer_size"])
+
+        # Q-Network
+        self.q_net = QNetwork(state_dim, action_dim)
+
+        # Optimizer
+        self.optimizer = torch.optim.Adam(self.q_net.parameters(), lr=config["lr"])
+        self.loss_fn = nn.MSELoss()
+    
+    def epsilonGreedyAction(self, env : SameIsLameEnv, s_tensor):
+        if random.random() < self.epsilon:
+            return env.action_space.sample()
+        else:
+            with torch.no_grad():
+                self.q_values = self.q_net(s_tensor)
+                return torch.argmax(self.q_values).item()
+
+    def appendReplayBuffer(self, transition : tuple):
+        self.replay_buffer.append(transition)
+
+    def trainStep(self):
+        if len(self.replay_buffer) >= self.batch_size:
+            batch = random.sample(self.replay_buffer, self.batch_size)
+            states, actions, rewards, next_states, dones = zip(*batch)
+
+            states = torch.tensor(np.array(states), dtype=torch.float32)
+            actions = torch.tensor(actions).unsqueeze(1)
+            rewards = torch.tensor(rewards, dtype=torch.float32)
+            next_states = torch.tensor(np.array(next_states), dtype=torch.float32)
+            dones = torch.tensor(dones, dtype=torch.float32)
+
+            # Current Q-values
+            q_values = self.q_net(states).gather(1, actions).squeeze()
+
+            # Target Q-values
+            with torch.no_grad():
+                next_q_values = self.q_net(next_states).max(1)[0]
+                targets = rewards + self.gamma * next_q_values * (1 - dones)
+
+            # Loss + backprop
+            loss = self.loss_fn(q_values, targets)
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+
+    def decayEpsilon(self):
+        if self.epsilon > self.epsilon_min:
+            self.epsilon *= self.epsilon_decay
+
+    def save(self, path : str):
+        torch.save(self.q_net.state_dict(), path)
+
+    def load(self, path : str):
+        self.q_net.load_state_dict(torch.load(path))
+        self.q_net.eval()
+
+class BasePlayer():
+    def __init__(self, policy : int):
+        self.policy = policy
+    
+    def epsilonGreedyAction(self, env : SameIsLameEnv, *args):
+        if self.policy == 1:
+            return random.choice([0,1])
+        if self.policy == 2:
+            return 3
+        return env.action_space.sample()#random.choice([0,1,2,3])
+    
+    def appendReplayBuffer(self, *args):
+        pass
+    def trainStep(self, *args):
+        pass
+    def decayEpsilon(self, *args):
+        pass
 
 """ CODE """
 
@@ -116,17 +202,16 @@ env = SameIsLameEnv()
 state_dim = len(env._get_obs()["scores"]) + 1  # scores + turn
 action_dim = env.action_space.n
 
-# Q-network + optimizer
-q_net = QNetwork(state_dim, action_dim)
-optimizer = optim.Adam(q_net.parameters(), lr=lr)
-loss_fn = nn.MSELoss()
-
-# Replay buffer
-replay_buffer = deque(maxlen=buffer_size)
-
 # Pick up Data
 totalRewardList = []
-#episodeResultList = []
+
+# Define player list
+players = [
+    AgentPlayer(state_dim=state_dim, action_dim=action_dim),
+    BasePlayer(0),
+    BasePlayer(1),
+    BasePlayer(2),
+]
 
 # Training loop
 for episode in range(episodes):
@@ -141,65 +226,32 @@ for episode in range(episodes):
         s_tensor = torch.tensor(s, dtype=torch.float32).unsqueeze(0)
 
         # Epsilon-greedy action
-        if random.random() < epsilon:
-            action = env.action_space.sample()
-        else:
-            with torch.no_grad():
-                q_values = q_net(s_tensor)
-                action = torch.argmax(q_values).item()
-
-        # Base Policies
-        p2, p3, p4 = basePolicies()
+        actionList = []
+        for player in players:
+            actionList.append(player.epsilonGreedyAction(env, s_tensor)) # What if I don't do list comprehension and put a comment instead out of free will, only to change it in the next commit because my code is faaaaaaaarr from profesional here?
 
         # Step environment
-        next_state, reward, done, _ = env.step([action, p2, p3, p4])  # single-agent for now
+        next_state, reward, done, _ = env.step(actionList)  # single-agent for now
         total_reward += reward[0]
 
         # Store transition
         ns = np.concatenate([next_state["scores"], [next_state["turn"]]])
-        replay_buffer.append((s, action, reward[0], ns, done))
+        # Add event to replay buffer and do training (the machine is learning, reinforcing even)
+        for i, p in enumerate(players):
+            p.appendReplayBuffer((s, actionList[i], reward[i], ns, done))
+            p.trainStep()
 
         state = next_state
 
-        # Train if enough samples, this is the part where the machine is learning
-        if len(replay_buffer) >= batch_size:
-            batch = random.sample(replay_buffer, batch_size)
-            states, actions, rewards, next_states, dones = zip(*batch)
-
-            #states = torch.tensor(states, dtype=torch.float32)
-            states = torch.tensor(np.array(states), dtype=torch.float32)
-            actions = torch.tensor(actions).unsqueeze(1)
-            rewards = torch.tensor(rewards, dtype=torch.float32)
-            #next_states = torch.tensor(next_states, dtype=torch.float32)
-            next_states = torch.tensor(np.array(next_states), dtype=torch.float32)
-            dones = torch.tensor(dones, dtype=torch.float32)
-
-            # Current Q-values
-            q_values = q_net(states).gather(1, actions).squeeze()
-
-            # Target Q-values
-            with torch.no_grad():
-                next_q_values = q_net(next_states).max(1)[0]
-                targets = rewards + gamma * next_q_values * (1 - dones)
-
-            # Loss + backprop
-            loss = loss_fn(q_values, targets)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+    # End of Episode
 
     # Decay epsilon
-    if epsilon > epsilon_min:
-        epsilon *= epsilon_decay
-
-    # End of Episode
+    for player in players:
+        player.decayEpsilon()
+ 
+    # Output
     print(f"Episode {episode}, Total Reward: {total_reward}")
     totalRewardList.append(total_reward)
-    #episodeResultList.append({
-    #    "final_scores": state["scores"],
-    #    "turns": state["turn"]
-    #})
-
 
 # Export Results
 with open("output/AgentScores.csv", "w") as output:
@@ -212,7 +264,7 @@ with open("output/AgentScores.csv", "w") as output:
 
 # Save replay buffer
 with open("output/replay_buffer.pkl", "wb") as output:
-    pickle.dump(list(replay_buffer), output)
+    pickle.dump(list(players[0].replay_buffer), output)
 
 # Export Agent
-torch.save(q_net.state_dict(), "output/q_network.pth")
+players[0].save("output/q_network.pth")
