@@ -14,7 +14,7 @@ class Player():
         self.type = type # 0 for random, 1 for human, 2 for AI
         self.score = 0
         self.choiceType = choiceType
-    
+
     def decisionManagement(self):
         if self.type == 0:
             if self.choiceType == 0:
@@ -29,10 +29,10 @@ class Player():
 
     def randomChoice(self):
         return random.choice([0,1,2,3])
-    
+
     def pick1or2(self):
         return random.choice([0,1])
-    
+
     def pick3or4(self):
         return random.choice([2,3])
 
@@ -85,7 +85,7 @@ while turns < terminalTurns + 1:
         players[i].score += uniqueChecks[i]
         if players[i].score >= winTurns:
             end = True
-    
+
     print(f"End Turn")
     for i in range(0, len(players)):
         print(f"Player {i + 1} pts: {players[i].score}", end=" | ")

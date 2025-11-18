@@ -67,7 +67,7 @@ class SameIsLameEnv(gym.Env):
 
     def _is_unique(self, action, action_list):
         return int(action_list.count(action) == 1)
-    
+
     def render(self, actions=None): # Not sure about if this will be used but it's kinda essential
         print(f"Turn {self.turn}")
         print(f"Player Actions: {actions}")
@@ -86,7 +86,7 @@ class SameIsLameEnv(gym.Env):
 
     def state_dim(self):
         return self.flatten_obs(self._get_obs()).shape[0]
-    
+
 class QNetwork(nn.Module):
     def __init__(self, state_dim, action_dim):
         super().__init__()
@@ -117,7 +117,7 @@ class AgentPlayer():
         # Optimizer
         self.optimizer = torch.optim.Adam(self.q_net.parameters(), lr=kwargs.get("lr", 1e-3))
         self.loss_fn = nn.MSELoss()
-    
+
     def epsilonGreedyAction(self, env : SameIsLameEnv, s_tensor):
         if random.random() < self.epsilon:
             return env.action_space.sample()
@@ -168,14 +168,14 @@ class AgentPlayer():
 class BasePlayer():
     def __init__(self, policy : int):
         self.policy = policy
-    
+
     def epsilonGreedyAction(self, env : SameIsLameEnv, *args):
         if self.policy == 1:
             return random.choice([0,1])
         if self.policy == 2:
             return 3
         return env.action_space.sample()
-    
+
     def appendReplayBuffer(self, *args):
         pass
     def trainStep(self, *args):
@@ -239,7 +239,7 @@ for episode in range(episodes):
     # Decay epsilon
     for player in players:
         player.decayEpsilon()
- 
+
     # Output
     print(f"Episode {episode}, Total Reward: {total_reward}")
     totalRewardList.append(total_reward)

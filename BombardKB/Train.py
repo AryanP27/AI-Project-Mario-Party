@@ -31,7 +31,7 @@ import pickle
 # Game Environment
 class BombardKBBEnv(gym.Env):
     def __init__(self, **kwargs):
-        
+
         self.bossHealth = kwargs.get("bossHealth", 26)
         self.rewards = kwargs.get("rewards", [1, 2, 3])
         self.punishment = kwargs.get("punishment", -1)
@@ -51,7 +51,7 @@ class BombardKBBEnv(gym.Env):
         self.action_space = Discrete(self.numChoices)
 
         self.reset() # This declares the other variables in a nonredundant way. Python's mysterious
-        
+
     def reset(self):
         self.scores = [0] * self.num_players
         self.HP = self.bossHealth
@@ -179,7 +179,7 @@ class AgentPlayer():
         # Optimizer
         self.optimizer = torch.optim.Adam(self.q_net.parameters(), lr=kwargs.get("lr", 1e-3))
         self.loss_fn = nn.MSELoss()
-    
+
     def epsilonGreedyAction(self, env : BombardKBBEnv, s_tensor):
         if random.random() < self.epsilon:
             return env.action_space.sample()
@@ -230,7 +230,7 @@ class AgentPlayer():
 class BasePlayer():
     def __init__(self, policy : int):
         self.policy = policy
-    
+
     def epsilonGreedyAction(self, env : BombardKBBEnv, *args):
         if self.policy == 1:
             return random.choice([0,1])
@@ -241,7 +241,7 @@ class BasePlayer():
         if self.policy == 4:
             return int(np.argmax(env.bobombs))
         return env.action_space.sample()
-    
+
     def appendReplayBuffer(self, *args):
         pass
     def trainStep(self, *args):
@@ -308,7 +308,7 @@ for episode in range(episodes):
     # Decay epsilon
     for player in players:
         player.decayEpsilon()
- 
+
     # Output
     print(f"Episode {episode}, Total Reward: {total_reward}")
     totalRewardList.append(total_reward)
