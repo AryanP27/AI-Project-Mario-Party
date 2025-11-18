@@ -28,7 +28,7 @@ import pickle
 """ Definitions """
 
 # Game Environment
-class SameIsLameEnv():
+class SameIsLameEnv(gym.Env):
     def __init__(self, **kwargs):
 
         self.num_players = kwargs.get("num_players", 4)
@@ -42,13 +42,17 @@ class SameIsLameEnv():
             "scores": gym.spaces.Box(low=0, high=self.terminate_on, shape=(self.num_players,), dtype=np.int32),
             "turn": Discrete(self.terminate_on + 1)
         })
+
         self.reset()
 
     def reset(self):
         self.scores = [0] * self.num_players
         self.turn = 1
         self.done = False
-        return self._get_obs()
+        return self.flatten_obs(self._get_obs())
+
+    def _get_obs(self):
+        return {"scores": np.array(self.scores), "turn": self.turn}
 
     def step(self, actions):
         self.unique_flags = [self._is_unique(a, actions) for a in actions]
@@ -59,10 +63,7 @@ class SameIsLameEnv():
         rewards = self.unique_flags
         if self.render_mode:
             self.render()
-        return self._get_obs(), rewards, self.done, {}
-
-    def _get_obs(self):
-        return {"scores": np.array(self.scores), "turn": self.turn}
+        return self.flatten_obs(self._get_obs()), rewards, self.done, {}
 
     def _is_unique(self, action, action_list):
         return int(action_list.count(action) == 1)
@@ -75,6 +76,16 @@ class SameIsLameEnv():
         for i in range(0, len(self.scores)):
             print(f"Player {i + 1} pts: {self.scores[i].score}", end=" | ")
         print("")
+
+    def flatten_obs(self, obs):
+        parts = []
+        for key, value in obs.items():
+            arr = np.array(value, dtype=np.float32).reshape(-1)
+            parts.append(arr)
+        return np.concatenate(parts, axis=0)
+
+    def state_dim(self):
+        return self.flatten_obs(self._get_obs()).shape[0]
     
 class QNetwork(nn.Module):
     def __init__(self, state_dim, action_dim):
@@ -182,7 +193,7 @@ episodes = 500
 
 # Environment
 env = SameIsLameEnv()
-state_dim = len(env._get_obs()["scores"]) + 1  # scores + turn
+state_dim = env.state_dim()  # scores + turn
 action_dim = env.action_space.n
 
 # Pick up Data
@@ -205,8 +216,7 @@ for episode in range(episodes):
     # The game itself
     while not done:
         # Convert state to tensor
-        s = np.concatenate([state["scores"], [state["turn"]]])
-        s_tensor = torch.tensor(s, dtype=torch.float32).unsqueeze(0)
+        s_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
 
         # Epsilon-greedy action
         actionList = []
@@ -217,11 +227,9 @@ for episode in range(episodes):
         next_state, reward, done, _ = env.step(actionList)  # single-agent for now
         total_reward += reward[0] # This is for agent/p1 since we output that
 
-        # Store transition
-        ns = np.concatenate([next_state["scores"], [next_state["turn"]]])
         # Add event to replay buffer and do training (the machine is learning, reinforcing even)
         for i, p in enumerate(players):
-            p.appendReplayBuffer((s, actionList[i], reward[i], ns, done))
+            p.appendReplayBuffer((state, actionList[i], reward[i], next_state, done))
             p.trainStep()
 
         state = next_state
