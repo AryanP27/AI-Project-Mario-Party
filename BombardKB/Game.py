@@ -1,5 +1,5 @@
 """
-    KingBBGame.py
+    BombardKB/Game.py
 
     This is a simulation of the game 'Bombard King Bob-omb' from Mario Party 9
 

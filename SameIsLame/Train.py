@@ -28,20 +28,15 @@ import pickle
 """ Definitions """
 
 # Game Environment
-class SameIsLameEnv(gym.Env):
-    def __init__(self, config : dict = {
-        "terminate_on" : 10,
-        "win_on" : 3,
-        "num_players" : 4,
-        "action_space" : 4,
-        "render_mode": True,
-    }):
-        self.num_players = config["num_players"]
-        self.action_space = Discrete(config["action_space"])  # Choices: 0, 1, 2, 3
+class SameIsLameEnv():
+    def __init__(self, **kwargs):
 
-        self.terminate_on = config["terminate_on"]
-        self.win_on = config["win_on"]
-        self.render_mode = config["render_mode"]
+        self.num_players = kwargs.get("num_players", 4)
+        self.action_space = Discrete(kwargs.get("action_space", 4))  # Choices: 0, 1, 2, 3
+
+        self.terminate_on = kwargs.get("terminate_on", 10)
+        self.win_on = kwargs.get("win_on", 3)
+        self.render_mode = kwargs.get("render_mode", False)
 
         self.observation_space = Dict({
             "scores": gym.spaces.Box(low=0, high=self.terminate_on, shape=(self.num_players,), dtype=np.int32),
@@ -62,6 +57,8 @@ class SameIsLameEnv(gym.Env):
         self.turn += 1
         self.done = self.turn > self.terminate_on or any(score >= self.win_on for score in self.scores)
         rewards = self.unique_flags
+        if self.render_mode:
+            self.render()
         return self._get_obs(), rewards, self.done, {}
 
     def _get_obs(self):
@@ -71,15 +68,13 @@ class SameIsLameEnv(gym.Env):
         return int(action_list.count(action) == 1)
     
     def render(self, actions=None): # Not sure about if this will be used but it's kinda essential
-        if self.render_mode:
-            print(f"Turn {self.turn}")
-            print(f"Player Actions: {actions}")
-            print(f"Who's unique?: {self.unique_flags}")
-            print(f"End Turn")
-            for i in range(0, len(self.scores)):
-                print(f"Player {i + 1} pts: {self.scores[i].score}", end=" | ")
-            print("")
-        return
+        print(f"Turn {self.turn}")
+        print(f"Player Actions: {actions}")
+        print(f"Who's unique?: {self.unique_flags}")
+        print(f"End Turn")
+        for i in range(0, len(self.scores)):
+            print(f"Player {i + 1} pts: {self.scores[i].score}", end=" | ")
+        print("")
     
 class QNetwork(nn.Module):
     def __init__(self, state_dim, action_dim):
@@ -93,31 +88,23 @@ class QNetwork(nn.Module):
         return self.fc(x)
 
 class AgentPlayer():
-    def __init__(self, state_dim, action_dim, config : dict = {
-        "lr" : 1e-3, # Learning Rate
-        "gamma" : 0.99, # Discount Factor
-        "epsilon" : 1.0,
-        "epsilon_decay" : 0.995,
-        "epsilon_min" : 0.1,
-        "batch_size" : 32,
-        "buffer_size" : 10000,
-    }):
+    def __init__(self, state_dim, action_dim, **kwargs):
         # Each player needs their own components
 
-        self.gamma = config["gamma"]
-        self.epsilon = config["epsilon"]
-        self.epsilon_decay = config["epsilon_decay"]
-        self.epsilon_min = config["epsilon_min"]
-        self.batch_size = config["batch_size"]
+        self.gamma = kwargs.get("gamma", 0.99)
+        self.epsilon = kwargs.get("epsilon", 1.0)
+        self.epsilon_decay = kwargs.get("epsilon_decay", 0.995)
+        self.epsilon_min = kwargs.get("epsilon_min", 0.1)
+        self.batch_size = kwargs.get("batch_size", 32)
 
         # Replay buffer
-        self.replay_buffer = deque(maxlen=config["buffer_size"])
+        self.replay_buffer = deque(maxlen=kwargs.get("buffer_size", 10000))
 
         # Q-Network
         self.q_net = QNetwork(state_dim, action_dim)
 
         # Optimizer
-        self.optimizer = torch.optim.Adam(self.q_net.parameters(), lr=config["lr"])
+        self.optimizer = torch.optim.Adam(self.q_net.parameters(), lr=kwargs.get("lr", 1e-3))
         self.loss_fn = nn.MSELoss()
     
     def epsilonGreedyAction(self, env : SameIsLameEnv, s_tensor):
@@ -176,7 +163,7 @@ class BasePlayer():
             return random.choice([0,1])
         if self.policy == 2:
             return 3
-        return env.action_space.sample()#random.choice([0,1,2,3])
+        return env.action_space.sample()
     
     def appendReplayBuffer(self, *args):
         pass
@@ -187,14 +174,10 @@ class BasePlayer():
 
 """ CODE """
 
+# Seed RNG
+random.seed(0)
+
 # Hyperparameters
-lr = 1e-3 # Learning Rate
-gamma = 0.99 # Discount Factor
-epsilon = 1.0
-epsilon_decay = 0.995
-epsilon_min = 0.1
-batch_size = 32
-buffer_size = 10000
 episodes = 500
 
 # Environment
@@ -228,11 +211,11 @@ for episode in range(episodes):
         # Epsilon-greedy action
         actionList = []
         for player in players:
-            actionList.append(player.epsilonGreedyAction(env, s_tensor)) # What if I don't do list comprehension and put a comment instead out of free will, only to change it in the next commit because my code is faaaaaaaarr from profesional here?
+            actionList.append(player.epsilonGreedyAction(env, s_tensor))
 
         # Step environment
         next_state, reward, done, _ = env.step(actionList)  # single-agent for now
-        total_reward += reward[0]
+        total_reward += reward[0] # This is for agent/p1 since we output that
 
         # Store transition
         ns = np.concatenate([next_state["scores"], [next_state["turn"]]])
