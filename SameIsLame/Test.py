@@ -1,7 +1,7 @@
 """
-    SameIsLame/Train.py
+    SameIsLame/Test.py
 
-    Trains a Reinforced Learning model to play a simulation of the game
+    Tests a Reinforced Learning model to play a simulation of the game
     'Same Is Lame' from Mario Party 6
 """
 
@@ -20,10 +20,6 @@ import torch
 import torch.nn as nn
 import numpy as np
 from collections import deque
-
-# Exporting Data
-import pickle
-#import json
 
 """ Definitions """
 
@@ -196,9 +192,6 @@ env = SameIsLameEnv()
 state_dim = env.state_dim()  # scores + turn
 action_dim = env.action_space.n
 
-# Pick up Data
-totalRewardList = []
-
 # Define player list
 players = [
     AgentPlayer(state_dim=state_dim, action_dim=action_dim),
@@ -207,7 +200,17 @@ players = [
     BasePlayer(2),
 ]
 
-# Training loop
+# Pick up Data
+totalRewardList = []
+episodeScores = []
+episodeTurns = []
+episodeWins = []
+winCount = 0
+
+# Load Player 1
+players[0].load("output/q_network.pth")
+
+# Testing loop
 for episode in range(episodes):
     state = env.reset()
     done = False
@@ -225,37 +228,24 @@ for episode in range(episodes):
 
         # Step environment
         next_state, reward, done, _ = env.step(actionList)  # single-agent for now
-        total_reward += reward[0] # This is for agent/p1 since we output that
-
-        # Add event to replay buffer and do training (the machine is learning, reinforcing even)
-        for i, p in enumerate(players):
-            p.appendReplayBuffer((state, actionList[i], reward[i], next_state, done))
-            p.trainStep()
+        total_reward += reward[0]
 
         state = next_state
 
     # End of Episode
 
-    # Decay epsilon
-    for player in players:
-        player.decayEpsilon()
-
     # Output
-    print(f"Episode {episode}, Total Reward: {total_reward}")
+    #print(f"Episode {episode}, Total Reward: {total_reward}")
     totalRewardList.append(total_reward)
+    episodeScores.append(env.scores)
+    episodeTurns.append(env.turn)
+
+    episodeWins.append(int(np.argmax(env.scores) == 0))
+    winCount += episodeWins[episode]
 
 # Export Results
-with open("output/AgentScores.csv", "w") as output:
-    output.write("Episode,Reward\n")
+print(f"Win Rate: {(winCount/episodes):.2%}")
+with open("output/TestData.csv", "w") as output:
+    output.write("Episode,Turns,Reward,Win,p1score,p2score,p3score,p4score\n")
     for i in range(episodes):
-        output.write(f"{str(i + 1)},{totalRewardList[i]}\n")
-
-#with open("output/EpisodeResults.json", "w") as output:
-#    json.dump(episodeResultList, output, indent=2)
-
-# Save replay buffer
-with open("output/replay_buffer.pkl", "wb") as output:
-    pickle.dump(list(players[0].replay_buffer), output)
-
-# Export Agent
-players[0].save("output/q_network.pth")
+        output.write(f"{str(i + 1)},{episodeTurns[i]},{totalRewardList[i]},{episodeWins[i]},{episodeScores[i][0]},{episodeScores[i][1]},{episodeScores[i][2]},{episodeScores[i][3]}\n")

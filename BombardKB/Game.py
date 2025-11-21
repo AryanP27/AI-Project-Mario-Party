@@ -1,5 +1,5 @@
 """
-    KingBBGame.py
+    BombardKB/Game.py
 
     This is a simulation of the game 'Bombard King Bob-omb' from Mario Party 9
 
@@ -18,7 +18,7 @@ class Player():
         self.type = type # 0 for random, 1 for human, 2 for AI
         self.score = 0
         self.choiceType = choiceType
-    
+
     def decisionManagement(self):
         if self.type == 0:
             if self.choiceType == 0:
@@ -33,10 +33,10 @@ class Player():
 
     def randomChoice(self):
         return random.choice([0,1,2,3])
-    
+
     def pick1or2(self):
         return random.choice([0,1])
-    
+
     def pick3or4(self):
         return random.choice([2,3])
 
