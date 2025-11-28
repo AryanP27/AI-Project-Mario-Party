@@ -245,7 +245,7 @@ for episode in range(episodes):
 
 # Export Results
 print(f"Win Rate: {(winCount/episodes):.2%}")
-with open("output/TestData.csv", "w") as output:
+with open("output/Test_Data.csv", "w") as output:
     output.write("Episode,Turns,Reward,Win,p1score,p2score,p3score,p4score\n")
     for i in range(episodes):
         output.write(f"{str(i + 1)},{episodeTurns[i]},{totalRewardList[i]},{episodeWins[i]},{episodeScores[i][0]},{episodeScores[i][1]},{episodeScores[i][2]},{episodeScores[i][3]}\n")

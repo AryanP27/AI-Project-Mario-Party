@@ -29,7 +29,7 @@ from collections import deque
 import pickle
 
 # Game Environment
-class BombardKBBEnv(gym.Env):
+class BombardKBEnv(gym.Env):
     def __init__(self, **kwargs):
 
         self.bossHealth = kwargs.get("bossHealth", 26)
@@ -180,7 +180,7 @@ class AgentPlayer():
         self.optimizer = torch.optim.Adam(self.q_net.parameters(), lr=kwargs.get("lr", 1e-3))
         self.loss_fn = nn.MSELoss()
 
-    def epsilonGreedyAction(self, env : BombardKBBEnv, s_tensor):
+    def epsilonGreedyAction(self, env : BombardKBEnv, s_tensor):
         if random.random() < self.epsilon:
             return env.action_space.sample()
         else:
@@ -231,7 +231,7 @@ class BasePlayer():
     def __init__(self, policy : int):
         self.policy = policy
 
-    def epsilonGreedyAction(self, env : BombardKBBEnv, *args):
+    def epsilonGreedyAction(self, env : BombardKBEnv, *args):
         if self.policy == 1:
             return random.choice([0,1])
         if self.policy == 2:
@@ -258,7 +258,7 @@ random.seed(0)
 episodes = 500
 
 # Environment
-env = BombardKBBEnv()
+env = BombardKBEnv()
 state_dim = env.state_dim()
 action_dim = env.action_space.n
 

@@ -1,15 +1,11 @@
 """
-    BombardLB/Train.py
+    SameIsLame/Data.py
 
-    Trains a Reinforced Learning model to play a simulation of the game
-    'Bombard King Bob-omb' from Mario Party 9
+    Evaluates a Reinforced Learning model that played simulation of
+    the game 'Same Is Lame' from Mario Party 6
 
-    Each turn, players will choose which Bob-omb they want to go for, but only get to throw the Bob-omb
-    if their decision was unique. Players have to balance picking the largest Bob-omb while not picking
-    the same Bob-omb as someone else.
+    Note: Run Train.py and Test.py first to get the expected files
 """
-
-""" Imports """
 
 # Randomization for Base Policies
 import random
@@ -24,6 +20,14 @@ import torch
 import torch.nn as nn
 import numpy as np
 from collections import deque
+
+# Evaluation
+import matplotlib.pyplot as plt
+import pickle
+import pandas as pd
+from scipy import stats
+
+""" Definitions """
 
 # Game Environment
 class BombardKBEnv(gym.Env):
@@ -157,162 +161,93 @@ class QNetwork(nn.Module):
     def forward(self, x):
         return self.fc(x)
 
-class AgentPlayer():
-    def __init__(self, state_dim, action_dim, **kwargs):
-
-        # Each player needs their own components
-        self.gamma = kwargs.get("gamma", 0.99)
-        self.epsilon = kwargs.get("epsilon", 1.0)
-        self.epsilon_decay = kwargs.get("epsilon_decay", 0.995)
-        self.epsilon_min = kwargs.get("epsilon_min", 0.1)
-        self.batch_size = kwargs.get("batch_size", 32)
-
-        # Replay buffer
-        self.replay_buffer = deque(maxlen=kwargs.get("buffer_size", 10000))
-
-        # Q-Network
-        self.q_net = QNetwork(state_dim, action_dim)
-
-        # Optimizer
-        self.optimizer = torch.optim.Adam(self.q_net.parameters(), lr=kwargs.get("lr", 1e-3))
-        self.loss_fn = nn.MSELoss()
-
-    def epsilonGreedyAction(self, env : BombardKBEnv, s_tensor):
-        if random.random() < self.epsilon:
-            return env.action_space.sample()
-        else:
-            with torch.no_grad():
-                self.q_values = self.q_net(s_tensor)
-                return torch.argmax(self.q_values).item()
-
-    def appendReplayBuffer(self, transition : tuple):
-        self.replay_buffer.append(transition)
-
-    def trainStep(self):
-        if len(self.replay_buffer) >= self.batch_size:
-            batch = random.sample(self.replay_buffer, self.batch_size)
-            states, actions, rewards, next_states, dones = zip(*batch)
-
-            states = torch.tensor(np.array(states), dtype=torch.float32)
-            actions = torch.tensor(actions).unsqueeze(1)
-            rewards = torch.tensor(rewards, dtype=torch.float32)
-            next_states = torch.tensor(np.array(next_states), dtype=torch.float32)
-            dones = torch.tensor(dones, dtype=torch.float32)
-
-            # Current Q-values
-            q_values = self.q_net(states).gather(1, actions).squeeze()
-
-            # Target Q-values
-            with torch.no_grad():
-                next_q_values = self.q_net(next_states).max(1)[0]
-                targets = rewards + self.gamma * next_q_values * (1 - dones)
-
-            # Loss + backprop
-            loss = self.loss_fn(q_values, targets)
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
-
-    def decayEpsilon(self):
-        if self.epsilon > self.epsilon_min:
-            self.epsilon *= self.epsilon_decay
-
-    def save(self, path : str):
-        torch.save(self.q_net.state_dict(), path)
-
-    def load(self, path : str):
-        self.q_net.load_state_dict(torch.load(path))
-        self.q_net.eval()
-
-class BasePlayer():
-    def __init__(self, policy : int):
-        self.policy = policy
-
-    def epsilonGreedyAction(self, env : BombardKBEnv, *args):
-        if self.policy == 1:
-            return random.choice([0,1])
-        if self.policy == 2:
-            return 3
-        if self.policy == 3:
-            return int(np.argmin(env.bobombs))
-        if self.policy == 4:
-            return int(np.argmax(env.bobombs))
-        return env.action_space.sample()
-
-    def appendReplayBuffer(self, *args):
-        pass
-    def trainStep(self, *args):
-        pass
-    def decayEpsilon(self, *args):
-        pass
-
-""" CODE """
-
-# Seed RNG
-random.seed(0)
-
-# Hyperparameters
-episodes = 500
+""" Code """
 
 # Environment
 env = BombardKBEnv()
-state_dim = env.state_dim()
+state_dim = env.state_dim()  # scores + turn
 action_dim = env.action_space.n
 
-# Define player list
-players = [
-    AgentPlayer(state_dim=state_dim, action_dim=action_dim),
-    BasePlayer(4), # Picking the largest bobomb to score most points
-    BasePlayer(0), # Picking randomly to be unpredictable
-    BasePlayer(3), # Picking smallest to try to guarantee points
-]
+# Load Q-Network
+q_net = QNetwork(state_dim, action_dim)
+q_net.load_state_dict(torch.load("output/q_network.pth"))
+q_net.eval()
 
-# Pick up Data
-totalRewardList = []
-episodeScores = []
-episodeTurns = []
-episodeWins = []
-winCount = 0
+# Plot Q Network Weights
+print("Q Network Weights")
+for name, param in q_net.named_parameters():
+    plt.hist(param.detach().numpy().flatten(), bins=50)
+    plt.title(f"Distribution of {name}")
+    plt.xlabel("Weight value")
+    plt.ylabel("Frequency")
+    plt.savefig(f"output/Data_{name.replace('.','_')}_hist.png")
+    plt.close()
 
-# Load Player 1
-players[0].load("output/q_network.pth")
+# Vizualize for Sample States
+print("Q Values")
+sample_state = env.reset()
+s_tensor = torch.tensor(sample_state, dtype=torch.float32).unsqueeze(0)
+q_values = q_net(s_tensor).detach().numpy()[0]
 
-# Testing loop
-for episode in range(episodes):
-    state = env.reset()
-    done = False
-    total_reward = 0
+plt.bar(range(action_dim), q_values)
+plt.xlabel("Actions")
+plt.ylabel("Q-value")
+plt.title("Q-values for sample state")
+plt.savefig("output/Data_q_values.png")
+plt.close()
 
-    # The game itself
-    while not done:
-        # Convert state to tensor
-        s_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
+# Table: bobomb lineup vs Q-values
+print("Q values per Bob-omb Lineup")
+df_q = pd.DataFrame({
+    "Bobomb": env.bobombs,
+    "Q-value": q_values
+})
+print(df_q)
 
-        # Epsilon-greedy action
-        actionList = []
-        for player in players:
-            actionList.append(player.epsilonGreedyAction(env, s_tensor))
+# Analyse Replay Buffer
+print("Action Distribution")
+with open("output/replay_buffer.pkl", "rb") as input:
+    buffer = pickle.load(input)
 
-        # Step environment
-        next_state, reward, done, _ = env.step(actionList)  # single-agent for now
-        total_reward += reward[0]
+actions = [t[1] for t in buffer]
+plt.hist(actions, bins=range(action_dim+1))
+plt.title("Action distribution in replay buffer")
+plt.savefig("output/Data_action_dist.png")
+plt.close()
 
-        state = next_state
+# Graph Test Data
+print("Test Data Chart")
+df = pd.read_csv("output/Test_Data.csv")
 
-    # End of Episode
+plt.figure(figsize=(12,6))
+for col in ["Turns","Reward","Win","p1score","p2score","p3score","p4score"]:
+    plt.plot(df["Episode"], df[col], label=col)
 
-    # Output
-    #print(f"Episode {episode}, Total Reward: {total_reward}")
-    totalRewardList.append(total_reward)
-    episodeScores.append(env.scores)
-    episodeTurns.append(env.turn)
+plt.xlabel("Episode")
+plt.ylabel("Value")
+plt.title("Training Results Over Episodes")
+plt.legend()
+plt.savefig("output/Data_Episodes.png")
+plt.close()
 
-    episodeWins.append(int(np.argmax(env.scores) == 0))
-    winCount += episodeWins[episode]
+#with open("output/Data_other_stats.txt","w") as output:
+#    pass
 
-# Export Results
-print(f"Win Rate: {(winCount/episodes):.2%}")
-with open("output/Test_Data.csv", "w") as output:
-    output.write("Episode,Turns,Reward,Win,p1score,p2score,p3score,p4score\n")
-    for i in range(episodes):
-        output.write(f"{str(i + 1)},{episodeTurns[i]},{totalRewardList[i]},{episodeWins[i]},{episodeScores[i][0]},{episodeScores[i][1]},{episodeScores[i][2]},{episodeScores[i][3]}\n")
+# Mean and std dev for each column
+print(df[["Turns","Reward","Win","p1score","p2score","p3score","p4score"]].mean())
+print(df[["Turns","Reward","Win","p1score","p2score","p3score","p4score"]].std())
+
+# Action Distribution Table
+print("Action Distribution Table")
+actions = [t[1] for t in buffer]
+df_actions = pd.DataFrame(actions, columns=["Action"])
+print(df_actions.value_counts())
+
+# ANOVA comparing scores across players
+f_val, p_val = stats.f_oneway(df["p1score"], df["p2score"], df["p3score"], df["p4score"])
+print("ANOVA F =", f_val, "p =", p_val)
+
+# Chi-square test on action distribution
+action_counts = df_actions["Action"].value_counts().values
+chi2, p = stats.chisquare(action_counts)
+print("Chi-square =", chi2, "p =", p)
