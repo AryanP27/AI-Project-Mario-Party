@@ -26,6 +26,7 @@ import matplotlib.pyplot as plt
 import pickle
 import pandas as pd
 from scipy import stats
+import itertools
 
 """ Definitions """
 
@@ -161,6 +162,19 @@ class QNetwork(nn.Module):
     def forward(self, x):
         return self.fc(x)
 
+def series_to_csv(series : pd.Series, columns : list[str], path : str):
+    pass
+
+def all_bobomb_lineups(rewards=[1,2,3], numChoices=4):
+    # Each slot can be 1, 2, or 3
+    # But you may want to enforce your "at most 2 of one size" rule
+    lineups = []
+    for combo in itertools.product(rewards, repeat=numChoices):
+        # enforce constraint: max 2 of any size
+        if all(combo.count(r) <= 2 for r in rewards):
+            lineups.append(combo)
+    return lineups
+
 """ Code """
 
 # Environment
@@ -198,11 +212,24 @@ plt.close()
 
 # Table: bobomb lineup vs Q-values
 print("Q values per Bob-omb Lineup")
-df_q = pd.DataFrame({
-    "Bobomb": env.bobombs,
-    "Q-value": q_values
-})
-print(df_q)
+lineups = all_bobomb_lineups()
+rows = []
+
+for lineup in lineups:
+    # sample state: scores + turn + bobombs + phase
+    # zeros for scores/turn/phase
+    sample_state = np.concatenate([np.zeros(env.num_players), [0], lineup, [0]])
+    s_tensor = torch.tensor(sample_state, dtype=torch.float32).unsqueeze(0)
+    q_values = q_net(s_tensor).detach().numpy()[0]
+
+    rows.append({
+        "Bobombs": lineup,
+        **{f"Q_action{a}": q_values[a] for a in range(action_dim)}
+    })
+
+df_q = pd.DataFrame(rows)
+#print(df_q.head())
+df_q.to_csv("output/Data_QValueTable.csv")
 
 # Analyse Replay Buffer
 print("Action Distribution")
@@ -230,24 +257,34 @@ plt.legend()
 plt.savefig("output/Data_Episodes.png")
 plt.close()
 
-#with open("output/Data_other_stats.txt","w") as output:
-#    pass
+# Calcuate more stats for one file
+print("Other Data")
+with open("output/Data_other_stats.txt","w") as output:
 
-# Mean and std dev for each column
-print(df[["Turns","Reward","Win","p1score","p2score","p3score","p4score"]].mean())
-print(df[["Turns","Reward","Win","p1score","p2score","p3score","p4score"]].std())
+    output.write("==== SCORE STATISTICS ====\n")
 
-# Action Distribution Table
-print("Action Distribution Table")
-actions = [t[1] for t in buffer]
-df_actions = pd.DataFrame(actions, columns=["Action"])
-print(df_actions.value_counts())
+    output.write("=== MEAN SCORES ===\n")
+    output.write(df[["Turns","Reward","Win","p1score","p2score","p3score","p4score"]].mean().to_string())
 
-# ANOVA comparing scores across players
-f_val, p_val = stats.f_oneway(df["p1score"], df["p2score"], df["p3score"], df["p4score"])
-print("ANOVA F =", f_val, "p =", p_val)
+    output.write("\n=== STANDARD DEVIATIONS OF SCORES ===\n")
+    output.write(df[["Turns","Reward","Win","p1score","p2score","p3score","p4score"]].std().to_string())
 
-# Chi-square test on action distribution
-action_counts = df_actions["Action"].value_counts().values
-chi2, p = stats.chisquare(action_counts)
-print("Chi-square =", chi2, "p =", p)
+    output.write("\n=== ANOVA OF SCORES ===\n")
+    f_val, p_val = stats.f_oneway(df["p1score"], df["p2score"], df["p3score"], df["p4score"])
+    output.write(f"F = {f_val} p = {p_val}\n")
+
+    output.write("\n\n==== AGENT ACTION STATISTICS ====\n")
+
+    output.write("=== ACTION DISTRIBUTIONS ===\n")
+    actions = [t[1] for t in buffer]
+    df_actions = pd.DataFrame(actions, columns=["Action"])
+    #output.write(df_actions.to_string())
+
+    output.write("\n=== CHI^2 ON ACTION DIST ===\n")
+    action_counts = df_actions["Action"].value_counts().values
+    chi2, p = stats.chisquare(action_counts)
+    output.write(f"Chi-square = {chi2} p = {p}")
+
+    output.write("\n=== ANOVA OF QVALUES AND STATESPACE ===\n")
+    f_val, p_val = stats.f_oneway(df_q["Q_action0"], df_q["Q_action1"], df_q["Q_action2"], df_q["Q_action3"])
+    output.write(f"F = {f_val} p = {p_val}\n")
