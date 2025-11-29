@@ -233,7 +233,7 @@ df_q.to_csv("output/Data_QValueTable.csv")
 
 # Analyse Replay Buffer
 print("Action Distribution")
-with open("output/replay_buffer.pkl", "rb") as input:
+with open("output/Train_replay_buffer.pkl", "rb") as input:
     buffer = pickle.load(input)
 
 actions = [t[1] for t in buffer]

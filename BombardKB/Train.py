@@ -314,7 +314,7 @@ for episode in range(episodes):
     totalRewardList.append(total_reward)
 
 # Export Results
-with open("output/AgentScores.csv", "w") as output:
+with open("output/Train_AgentScores.csv", "w") as output:
     output.write("Episode,Reward\n")
     for i in range(episodes):
         output.write(f"{str(i + 1)},{totalRewardList[i]}\n")
@@ -323,8 +323,8 @@ with open("output/AgentScores.csv", "w") as output:
 #    json.dump(episodeResultList, output, indent=2)
 
 # Save replay buffer
-with open("output/replay_buffer.pkl", "wb") as output:
+with open("output/Train_replay_buffer.pkl", "wb") as output:
     pickle.dump(list(players[0].replay_buffer), output)
 
 # Export Agent
-players[0].save("output/q_network.pth")
+players[0].save("output/Train_q_network.pth")

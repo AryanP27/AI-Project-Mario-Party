@@ -7,6 +7,8 @@
     Each turn, players will choose which Bob-omb they want to go for, but only get to throw the Bob-omb
     if their decision was unique. Players have to balance picking the largest Bob-omb while not picking
     the same Bob-omb as someone else.
+
+    Note: Run Train.py first to get q_network
 """
 
 """ Imports """
@@ -24,6 +26,9 @@ import torch
 import torch.nn as nn
 import numpy as np
 from collections import deque
+
+# Exporting Data
+import pickle
 
 # Game Environment
 class BombardKBEnv(gym.Env):
@@ -275,7 +280,7 @@ episodeWins = []
 winCount = 0
 
 # Load Player 1
-players[0].load("output/q_network.pth")
+players[0].load("output/Train_q_network.pth")
 
 # Testing loop
 for episode in range(episodes):
@@ -297,6 +302,10 @@ for episode in range(episodes):
         next_state, reward, done, _ = env.step(actionList)  # single-agent for now
         total_reward += reward[0]
 
+        # Add event to replay buffer and do training (the machine is learning, reinforcing even)
+        for i, p in enumerate(players):
+            p.appendReplayBuffer((state, actionList[i], reward[i], next_state, done))
+
         state = next_state
 
     # End of Episode
@@ -316,3 +325,7 @@ with open("output/Test_Data.csv", "w") as output:
     output.write("Episode,Turns,Reward,Win,p1score,p2score,p3score,p4score\n")
     for i in range(episodes):
         output.write(f"{str(i + 1)},{episodeTurns[i]},{totalRewardList[i]},{episodeWins[i]},{episodeScores[i][0]},{episodeScores[i][1]},{episodeScores[i][2]},{episodeScores[i][3]}\n")
+
+# Save replay buffer
+with open("output/Test_replay_buffer.pkl", "wb") as output:
+    pickle.dump(list(players[0].replay_buffer), output)
