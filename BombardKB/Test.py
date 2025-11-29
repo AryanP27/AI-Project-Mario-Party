@@ -276,8 +276,14 @@ players = [
 totalRewardList = []
 episodeScores = []
 episodeTurns = []
-episodeWins = []
-winCount = 0
+p1wins = []
+p2wins = []
+p3wins = []
+p4wins = []
+p1WinCount = 0
+p2WinCount = 0
+p3WinCount = 0
+p4WinCount = 0
 
 # Load Player 1
 players[0].load("output/Train_q_network.pth")
@@ -316,15 +322,28 @@ for episode in range(episodes):
     episodeScores.append(env.scores)
     episodeTurns.append(env.turn)
 
-    episodeWins.append(int(np.argmax(env.scores) == 0))
-    winCount += episodeWins[episode]
+    winningIndex = np.argmax(env.scores)
+    winningScore = env.scores[winningIndex]
+
+    p1wins.append(int(winningIndex == 0)) # Always prioritizes leftmost index
+    p2wins.append(int(winningScore == env.scores[1]))
+    p3wins.append(int(winningScore == env.scores[2]))
+    p4wins.append(int(winningScore == env.scores[3]))
+
+    p1WinCount += p1wins[episode]
+    p2WinCount += p2wins[episode]
+    p3WinCount += p3wins[episode]
+    p4WinCount += p4wins[episode]
 
 # Export Results
-print(f"Win Rate: {(winCount/episodes):.2%}")
+print(f"Win Rate P1: {(p1WinCount/episodes):.2%}")
+print(f"Win Rate P2: {(p2WinCount/episodes):.2%}")
+print(f"Win Rate P3: {(p3WinCount/episodes):.2%}")
+print(f"Win Rate P4: {(p4WinCount/episodes):.2%}")
 with open("output/Test_Data.csv", "w") as output:
-    output.write("Episode,Turns,Reward,Win,p1score,p2score,p3score,p4score\n")
+    output.write("Episode,Turns,Reward,p1win,p2win,p3win,p4win,p1score,p2score,p3score,p4score\n")
     for i in range(episodes):
-        output.write(f"{str(i + 1)},{episodeTurns[i]},{totalRewardList[i]},{episodeWins[i]},{episodeScores[i][0]},{episodeScores[i][1]},{episodeScores[i][2]},{episodeScores[i][3]}\n")
+        output.write(f"{str(i + 1)},{episodeTurns[i]},{totalRewardList[i]},{p1wins[i]},{p2wins[i]},{p3wins[i]},{p4wins[i]},{episodeScores[i][0]},{episodeScores[i][1]},{episodeScores[i][2]},{episodeScores[i][3]}\n")
 
 # Save replay buffer
 with open("output/Test_replay_buffer.pkl", "wb") as output:

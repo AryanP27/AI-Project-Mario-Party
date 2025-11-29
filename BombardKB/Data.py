@@ -231,30 +231,55 @@ df_q = pd.DataFrame(rows)
 #print(df_q.head())
 df_q.to_csv("output/Data_QValueTable.csv")
 
-# Analyse Replay Buffer
-print("Action Distribution")
+# Analyse Replay Buffers
+print("Train Action Distribution")
 with open("output/Train_replay_buffer.pkl", "rb") as input:
-    buffer = pickle.load(input)
+    buffer_train = pickle.load(input)
 
-actions = [t[1] for t in buffer]
+actions = [t[1] for t in buffer_train]
 plt.hist(actions, bins=range(action_dim+1))
-plt.title("Action distribution in replay buffer")
-plt.savefig("output/Data_action_dist.png")
+plt.title("Action distribution in replay buffer_train")
+plt.savefig("output/Data_train_action_dist.png")
+plt.close()
+
+print("Test Action Distribution")
+with open("output/Test_replay_buffer.pkl", "rb") as input:
+    buffer_test = pickle.load(input)
+
+actions = [t[1] for t in buffer_test]
+plt.hist(actions, bins=range(action_dim+1))
+plt.title("Action distribution in replay buffer_train")
+plt.savefig("output/Data_test_action_dist.png")
 plt.close()
 
 # Graph Test Data
 print("Test Data Chart")
-df = pd.read_csv("output/Test_Data.csv")
+df_test = pd.read_csv("output/Test_Data.csv")
 
 plt.figure(figsize=(12,6))
-for col in ["Turns","Reward","Win","p1score","p2score","p3score","p4score"]:
-    plt.plot(df["Episode"], df[col], label=col)
+for col in ["Turns","Reward","p1win","p1score","p2score","p3score","p4score"]:
+    plt.plot(df_test["Episode"], df_test[col], label=col)
 
 plt.xlabel("Episode")
 plt.ylabel("Value")
-plt.title("Training Results Over Episodes")
+plt.title("Testing Results Over Episodes")
 plt.legend()
 plt.savefig("output/Data_Episodes.png")
+plt.close()
+
+# Graph Training Rewards
+print("Train Data Chart")
+df_train = pd.read_csv("output/Train_AgentScores.csv")
+
+plt.figure(figsize=(12,6))
+for col in ["Reward"]:
+    plt.plot(df_test["Episode"], df_test[col], label=col)
+
+plt.xlabel("Episode")
+plt.ylabel("Reward")
+plt.title("Training Results Over Episodes")
+#plt.legend()
+plt.savefig("output/Data_training_rewards.png")
 plt.close()
 
 # Calcuate more stats for one file
@@ -264,23 +289,23 @@ with open("output/Data_other_stats.txt","w") as output:
     output.write("==== SCORE STATISTICS ====\n")
 
     output.write("=== MEAN SCORES ===\n")
-    output.write(df[["Turns","Reward","Win","p1score","p2score","p3score","p4score"]].mean().to_string())
+    output.write(df_test[["Turns","Reward","p1win","p1score","p2score","p3score","p4score"]].mean().to_string())
 
     output.write("\n=== STANDARD DEVIATIONS OF SCORES ===\n")
-    output.write(df[["Turns","Reward","Win","p1score","p2score","p3score","p4score"]].std().to_string())
+    output.write(df_test[["Turns","Reward","p1win","p1score","p2score","p3score","p4score"]].std().to_string())
 
     output.write("\n=== ANOVA OF SCORES ===\n")
-    f_val, p_val = stats.f_oneway(df["p1score"], df["p2score"], df["p3score"], df["p4score"])
+    f_val, p_val = stats.f_oneway(df_test["p1score"], df_test["p2score"], df_test["p3score"], df_test["p4score"])
     output.write(f"F = {f_val} p = {p_val}\n")
 
     output.write("\n\n==== AGENT ACTION STATISTICS ====\n")
 
-    output.write("=== ACTION DISTRIBUTIONS ===\n")
-    actions = [t[1] for t in buffer]
+    #output.write("=== ACTION DISTRIBUTIONS ===\n")
+    actions = [t[1] for t in buffer_test]
     df_actions = pd.DataFrame(actions, columns=["Action"])
     #output.write(df_actions.to_string())
 
-    output.write("\n=== CHI^2 ON ACTION DIST ===\n")
+    output.write("=== CHI^2 ON ACTION DIST ===\n")
     action_counts = df_actions["Action"].value_counts().values
     chi2, p = stats.chisquare(action_counts)
     output.write(f"Chi-square = {chi2} p = {p}")
