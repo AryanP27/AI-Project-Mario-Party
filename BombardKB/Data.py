@@ -184,7 +184,7 @@ action_dim = env.action_space.n
 
 # Load Q-Network
 q_net = QNetwork(state_dim, action_dim)
-q_net.load_state_dict(torch.load("output/q_network.pth"))
+q_net.load_state_dict(torch.load("output/Train_q_network.pth"))
 q_net.eval()
 
 # Plot Q Network Weights

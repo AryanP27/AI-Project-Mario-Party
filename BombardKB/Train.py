@@ -268,9 +268,9 @@ totalRewardList = []
 # Define player list
 players = [
     AgentPlayer(state_dim=state_dim, action_dim=action_dim),
-    BasePlayer(4), # Picking the largest bobomb to score most points
+    BasePlayer(0), # Picking the largest bobomb to score most points
     BasePlayer(0), # Picking randomly to be unpredictable
-    BasePlayer(3), # Picking smallest to try to guarantee points
+    BasePlayer(0), # Picking smallest to try to guarantee points
 ]
 
 # Training loop
