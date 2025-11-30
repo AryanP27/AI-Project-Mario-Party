@@ -232,15 +232,21 @@ class BasePlayer():
         self.policy = policy
 
     def epsilonGreedyAction(self, env : BombardKBEnv, *args):
-        if self.policy == 1:
-            return random.choice([0,1])
-        if self.policy == 2:
-            return 3
-        if self.policy == 3:
-            return int(np.argmin(env.bobombs))
-        if self.policy == 4:
-            return int(np.argmax(env.bobombs))
-        return env.action_space.sample()
+        match self.policy:
+            case 1:
+                return random.choice([0,1])
+            case 2:
+                return 3
+            case 3:
+                return int(np.argmin(env.bobombs))
+            case 4:
+                return int(np.argmax(env.bobombs))
+            case 5:
+                if random.choice([0,1]) == 0:
+                    return int(np.argmax(env.bobombs))
+                return env.action_space.sample()
+            case _:
+                return env.action_space.sample()
 
     def appendReplayBuffer(self, *args):
         pass
@@ -268,9 +274,9 @@ totalRewardList = []
 # Define player list
 players = [
     AgentPlayer(state_dim=state_dim, action_dim=action_dim),
-    BasePlayer(0), # Picking the largest bobomb to score most points
-    BasePlayer(0), # Picking randomly to be unpredictable
-    BasePlayer(0), # Picking smallest to try to guarantee points
+    BasePlayer(5),
+    BasePlayer(5),
+    BasePlayer(5),
 ]
 
 # Training loop
@@ -310,7 +316,7 @@ for episode in range(episodes):
         player.decayEpsilon()
 
     # Output
-    print(f"Episode {episode}, Total Reward: {total_reward}")
+    print(f"Episode {episode}, Total Reward: {total_reward}, Epsilon: {players[0].epsilon}")
     totalRewardList.append(total_reward)
 
 # Export Results
@@ -318,9 +324,6 @@ with open("output/Train_AgentScores.csv", "w") as output:
     output.write("Episode,Reward\n")
     for i in range(episodes):
         output.write(f"{str(i + 1)},{totalRewardList[i]}\n")
-
-#with open("output/EpisodeResults.json", "w") as output:
-#    json.dump(episodeResultList, output, indent=2)
 
 # Save replay buffer
 with open("output/Train_replay_buffer.pkl", "wb") as output:

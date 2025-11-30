@@ -26,6 +26,9 @@ import matplotlib.pyplot as plt
 import pickle
 import pandas as pd
 from scipy import stats
+from math import sqrt
+
+# Bob-omb lineups
 import itertools
 
 """ Definitions """
@@ -162,9 +165,6 @@ class QNetwork(nn.Module):
     def forward(self, x):
         return self.fc(x)
 
-def series_to_csv(series : pd.Series, columns : list[str], path : str):
-    pass
-
 def all_bobomb_lineups(rewards=[1,2,3], numChoices=4):
     # Each slot can be 1, 2, or 3
     # But you may want to enforce your "at most 2 of one size" rule
@@ -175,11 +175,26 @@ def all_bobomb_lineups(rewards=[1,2,3], numChoices=4):
             lineups.append(combo)
     return lineups
 
+def zScoreMean(df: pd.DataFrame, column: str, expectedMean: float):
+    sample_mean = df[column].mean()
+    sample_std = df[column].std()
+    n = len(df)
+
+    z = (sample_mean - expectedMean) / (sample_std / sqrt(n))
+    return z
+
+def zScoreProp(df: pd.DataFrame, column: str, expectedProp: float):
+    sample_prop = df[column].mean()
+    n = len(df)
+
+    z = (sample_prop - expectedProp) / sqrt((expectedProp * (1 - expectedProp)) / n)
+    return z
+
 """ Code """
 
 # Environment
 env = BombardKBEnv()
-state_dim = env.state_dim()  # scores + turn
+state_dim = env.state_dim()
 action_dim = env.action_space.n
 
 # Load Q-Network
@@ -248,24 +263,34 @@ with open("output/Test_replay_buffer.pkl", "rb") as input:
 
 actions = [t[1] for t in buffer_test]
 plt.hist(actions, bins=range(action_dim+1))
-plt.title("Action distribution in replay buffer_train")
+plt.title("Action distribution in replay buffer_test")
 plt.savefig("output/Data_test_action_dist.png")
 plt.close()
 
-# Graph Test Data
+# Graph Testing Data
 print("Test Data Chart")
 df_test = pd.read_csv("output/Test_Data.csv")
 
 plt.figure(figsize=(12,6))
-for col in ["Turns","Reward","p1win","p1score","p2score","p3score","p4score"]:
+for col in ["Reward","p1win","p1score","p2score","p3score","p4score"]:
     plt.plot(df_test["Episode"], df_test[col], label=col)
 
 plt.xlabel("Episode")
 plt.ylabel("Value")
-plt.title("Testing Results Over Episodes")
+plt.title("Training Results Over Episodes")
 plt.legend()
 plt.savefig("output/Data_Episodes.png")
 plt.close()
+
+plt.figure(figsize=(12,6))
+for col in ["Turns"]:
+    plt.plot(df_test["Episode"], df_test[col], label=col)
+
+    plt.xlabel("Episode")
+    plt.ylabel(col)
+    plt.title("Training Results Over Episodes")
+    plt.savefig(f"output/Data_Episode_{col}.png")
+    plt.close()
 
 # Graph Training Rewards
 print("Train Data Chart")
@@ -273,14 +298,13 @@ df_train = pd.read_csv("output/Train_AgentScores.csv")
 
 plt.figure(figsize=(12,6))
 for col in ["Reward"]:
-    plt.plot(df_test["Episode"], df_test[col], label=col)
+    plt.plot(df_train["Episode"], df_train[col], label=col)
 
-plt.xlabel("Episode")
-plt.ylabel("Reward")
-plt.title("Training Results Over Episodes")
-#plt.legend()
-plt.savefig("output/Data_training_rewards.png")
-plt.close()
+    plt.xlabel("Episode")
+    plt.ylabel(col)
+    plt.title("Training Results Over Episodes")
+    plt.savefig(f"output/Data_training_{col}.png")
+    plt.close()
 
 # Calcuate more stats for one file
 print("Other Data")
@@ -294,16 +318,17 @@ with open("output/Data_other_stats.txt","w") as output:
     output.write("\n=== STANDARD DEVIATIONS OF SCORES ===\n")
     output.write(df_test[["Turns","Reward","p1win","p1score","p2score","p3score","p4score"]].std().to_string())
 
+    output.write("\n=== Z SCORE P1 WINRATE VS 25% ===\n")
+    output.write(f"Z = {zScoreProp(df_test, "p1win", 0.25)}")
+
     output.write("\n=== ANOVA OF SCORES ===\n")
     f_val, p_val = stats.f_oneway(df_test["p1score"], df_test["p2score"], df_test["p3score"], df_test["p4score"])
     output.write(f"F = {f_val} p = {p_val}\n")
 
     output.write("\n\n==== AGENT ACTION STATISTICS ====\n")
 
-    #output.write("=== ACTION DISTRIBUTIONS ===\n")
     actions = [t[1] for t in buffer_test]
     df_actions = pd.DataFrame(actions, columns=["Action"])
-    #output.write(df_actions.to_string())
 
     output.write("=== CHI^2 ON ACTION DIST ===\n")
     action_counts = df_actions["Action"].value_counts().values

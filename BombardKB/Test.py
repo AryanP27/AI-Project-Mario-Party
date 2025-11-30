@@ -234,15 +234,21 @@ class BasePlayer():
         self.policy = policy
 
     def epsilonGreedyAction(self, env : BombardKBEnv, *args):
-        if self.policy == 1:
-            return random.choice([0,1])
-        if self.policy == 2:
-            return 3
-        if self.policy == 3:
-            return int(np.argmin(env.bobombs))
-        if self.policy == 4:
-            return int(np.argmax(env.bobombs))
-        return env.action_space.sample()
+        match self.policy:
+            case 1:
+                return random.choice([0,1])
+            case 2:
+                return 3
+            case 3:
+                return int(np.argmin(env.bobombs))
+            case 4:
+                return int(np.argmax(env.bobombs))
+            case 5:
+                if random.choice([0,1]) == 0:
+                    return int(np.argmax(env.bobombs))
+                return env.action_space.sample()
+            case _:
+                return env.action_space.sample()
 
     def appendReplayBuffer(self, *args):
         pass
@@ -266,10 +272,10 @@ action_dim = env.action_space.n
 
 # Define player list
 players = [
-    AgentPlayer(state_dim=state_dim, action_dim=action_dim),
-    BasePlayer(0), # Picking the largest bobomb to score most points
-    BasePlayer(0), # Picking randomly to be unpredictable
-    BasePlayer(0), # Picking smallest to try to guarantee points
+    AgentPlayer(state_dim=state_dim, action_dim=action_dim, epsilon=0.1),
+    BasePlayer(5),
+    BasePlayer(5),
+    BasePlayer(5),
 ]
 
 # Pick up Data
@@ -325,7 +331,7 @@ for episode in range(episodes):
     winningIndex = np.argmax(env.scores)
     winningScore = env.scores[winningIndex]
 
-    p1wins.append(int(winningIndex == 0)) # Always prioritizes leftmost index
+    p1wins.append(int(winningIndex == 0))
     p2wins.append(int(winningScore == env.scores[1]))
     p3wins.append(int(winningScore == env.scores[2]))
     p4wins.append(int(winningScore == env.scores[3]))

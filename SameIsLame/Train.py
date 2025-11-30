@@ -23,7 +23,6 @@ from collections import deque
 
 # Exporting Data
 import pickle
-#import json
 
 """ Definitions """
 
@@ -170,12 +169,22 @@ class BasePlayer():
         self.policy = policy
 
     def epsilonGreedyAction(self, env : SameIsLameEnv, *args):
-        if self.policy == 1:
-            return random.choice([0,1])
-        if self.policy == 2:
-            return 3
-        return env.action_space.sample()
-
+        match self.policy:
+            case "AB":
+                return random.choice([0,1])
+            case "LR":
+                return random.choice([2,3])
+            case "random":
+                return env.action_space.sample()
+            case number:
+                try:
+                    if number < env.action_space.n and number >= 0:
+                        return number
+                except:
+                    print(f"Action Space Fail {number}")
+                    return env.action_space.sample()
+                return env.action_space.sample()
+        
     def appendReplayBuffer(self, *args):
         pass
     def trainStep(self, *args):
@@ -245,17 +254,14 @@ for episode in range(episodes):
     totalRewardList.append(total_reward)
 
 # Export Results
-with open("output/AgentScores.csv", "w") as output:
+with open("output/Train_AgentScores.csv", "w") as output:
     output.write("Episode,Reward\n")
     for i in range(episodes):
         output.write(f"{str(i + 1)},{totalRewardList[i]}\n")
 
-#with open("output/EpisodeResults.json", "w") as output:
-#    json.dump(episodeResultList, output, indent=2)
-
 # Save replay buffer
-with open("output/replay_buffer.pkl", "wb") as output:
+with open("output/Train_replay_buffer.pkl", "wb") as output:
     pickle.dump(list(players[0].replay_buffer), output)
 
 # Export Agent
-players[0].save("output/q_network.pth")
+players[0].save("output/Train_q_network.pth")
