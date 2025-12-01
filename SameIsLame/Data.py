@@ -25,6 +25,8 @@ from collections import deque
 import matplotlib.pyplot as plt
 import pickle
 import pandas as pd
+from scipy import stats
+from math import sqrt
 
 """ Definitions """
 
@@ -99,6 +101,21 @@ class QNetwork(nn.Module):
     def forward(self, x):
         return self.fc(x)
 
+def zScoreMean(df: pd.DataFrame, column: str, expectedMean: float):
+    sample_mean = df[column].mean()
+    sample_std = df[column].std()
+    n = len(df)
+
+    z = (sample_mean - expectedMean) / (sample_std / sqrt(n))
+    return z
+
+def zScoreProp(df: pd.DataFrame, column: str, expectedProp: float):
+    sample_prop = df[column].mean()
+    n = len(df)
+
+    z = (sample_prop - expectedProp) / sqrt((expectedProp * (1 - expectedProp)) / n)
+    return z
+
 """ Code """
 
 # Environment
@@ -108,7 +125,7 @@ action_dim = env.action_space.n
 
 # Load Q-Network
 q_net = QNetwork(state_dim, action_dim)
-q_net.load_state_dict(torch.load("output/q_network.pth"))
+q_net.load_state_dict(torch.load("output/Train_q_network.pth"))
 q_net.eval()
 
 # Plot Q Network Weights
@@ -134,24 +151,34 @@ plt.title("Q-values for sample state")
 plt.savefig("output/Data_q_values.png")
 plt.close()
 
-# Analyse Replay Buffer
-print("Action Distribution")
-with open("output/replay_buffer.pkl", "rb") as input:
-    buffer = pickle.load(input)
+# Analyse Replay Buffers
+print("Train Action Distribution")
+with open("output/Train_replay_buffer.pkl", "rb") as input:
+    buffer_train = pickle.load(input)
 
-actions = [t[1] for t in buffer]
+actions = [t[1] for t in buffer_train]
 plt.hist(actions, bins=range(action_dim+1))
-plt.title("Action distribution in replay buffer")
-plt.savefig("output/Data_action_dist.png")
+plt.title("Action distribution in replay buffer_train")
+plt.savefig("output/Data_train_action_dist.png")
 plt.close()
 
-# Graph Test Data
+print("Test Action Distribution")
+with open("output/Test_replay_buffer.pkl", "rb") as input:
+    buffer_test = pickle.load(input)
+
+actions = [t[1] for t in buffer_test]
+plt.hist(actions, bins=range(action_dim+1))
+plt.title("Action distribution in replay buffer_test")
+plt.savefig("output/Data_test_action_dist.png")
+plt.close()
+
+# Graph Testing Data
 print("Test Data Chart")
-df = pd.read_csv("output/Test_Data.csv")
+df_test = pd.read_csv("output/Test_Data.csv")
 
 plt.figure(figsize=(12,6))
-for col in ["Turns","Reward","Win","p1score","p2score","p3score","p4score"]:
-    plt.plot(df["Episode"], df[col], label=col)
+for col in ["Reward","p1win","p1score","p2score","p3score","p4score"]:
+    plt.plot(df_test["Episode"], df_test[col], label=col)
 
 plt.xlabel("Episode")
 plt.ylabel("Value")
@@ -159,3 +186,56 @@ plt.title("Training Results Over Episodes")
 plt.legend()
 plt.savefig("output/Data_Episodes.png")
 plt.close()
+
+plt.figure(figsize=(12,6))
+for col in ["Turns"]:
+    plt.plot(df_test["Episode"], df_test[col], label=col)
+
+    plt.xlabel("Episode")
+    plt.ylabel(col)
+    plt.title("Testing Results") # SHOULD BE TESTING, THIS TYPO IS IN MY SLIDES
+    plt.savefig(f"output/Data_Episode_{col}.png")
+    plt.close()
+
+# Graph Training Rewards
+print("Train Data Chart")
+df_train = pd.read_csv("output/Train_AgentScores.csv")
+
+plt.figure(figsize=(12,6))
+for col in ["Reward"]:
+    plt.plot(df_train["Episode"], df_train[col], label=col)
+
+    plt.xlabel("Episode")
+    plt.ylabel(col)
+    plt.title("Testing Results") # SHOULD BE TESTING, THIS TYPO IS IN MY SLIDES
+    plt.savefig(f"output/Data_training_{col}.png")
+    plt.close()
+
+# Calcuate more stats for one file
+print("Other Data")
+with open("output/Data_other_stats.txt","w") as output:
+
+    output.write("==== SCORE STATISTICS ====\n")
+
+    output.write("=== MEAN SCORES ===\n")
+    output.write(df_test[["Turns","Reward","p1win","p1score","p2score","p3score","p4score"]].mean().to_string())
+
+    output.write("\n=== STANDARD DEVIATIONS OF SCORES ===\n")
+    output.write(df_test[["Turns","Reward","p1win","p1score","p2score","p3score","p4score"]].std().to_string())
+
+    output.write("\n=== Z SCORE P1 WINRATE VS 25% ===\n")
+    output.write(f"Z = {zScoreProp(df_test, "p1win", 0.25)}")
+
+    output.write("\n=== ANOVA OF SCORES ===\n")
+    f_val, p_val = stats.f_oneway(df_test["p1score"], df_test["p2score"], df_test["p3score"], df_test["p4score"])
+    output.write(f"F = {f_val} p = {p_val}\n")
+
+    output.write("\n==== AGENT ACTION STATISTICS ====\n")
+
+    actions = [t[1] for t in buffer_test]
+    df_actions = pd.DataFrame(actions, columns=["Action"])
+
+    output.write("=== CHI^2 ON ACTION DIST ===\n")
+    action_counts = df_actions["Action"].value_counts().values
+    chi2, p = stats.chisquare(action_counts)
+    output.write(f"Chi-square = {chi2} p = {p}\n")
