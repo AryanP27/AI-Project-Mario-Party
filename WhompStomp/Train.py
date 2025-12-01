@@ -145,7 +145,7 @@ class AgentPlayer():
         self.gamma = kwargs.get("gamma", 0.99)
         self.epsilon = kwargs.get("epsilon", 1.0)
         self.epsilon_decay = kwargs.get("epsilon_decay", 0.995)
-        self.epsilon_min = kwargs.get("epsilon_min", 0.05)
+        self.epsilon_min = kwargs.get("epsilon_min", 0.1)
         self.batch_size = kwargs.get("batch_size", 32)
         
         self.replay_buffer = deque(maxlen=kwargs.get("buffer_size", 10000))

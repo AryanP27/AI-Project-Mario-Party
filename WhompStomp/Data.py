@@ -157,6 +157,32 @@ plt.title("Q-values for Initial State")
 plt.savefig("output/Data_q_values.png")
 plt.close()
 
+# Q-values for specific positions and scores
+print("Generating Q-values for Specific Positions...")
+positions_to_test = [0, 1, 2, 3]
+scores_to_test = [0, 10, 20, 32]
+
+fig, axes = plt.subplots(len(positions_to_test), len(scores_to_test), figsize=(14, 10))
+fig.suptitle("Q-values by Position and Score", fontsize=16)
+
+for pos_idx, position in enumerate(positions_to_test):
+    for score_idx, score in enumerate(scores_to_test):
+        # Create state: [score, position]
+        state = np.array([score, position], dtype=np.float32)
+        s_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
+        q_values = q_net(s_tensor).detach().numpy()[0]
+        
+        ax = axes[pos_idx, score_idx]
+        ax.bar(range(action_dim), q_values, color=['blue', 'red'])
+        ax.set_title(f"Pos {position}, Score {score}")
+        ax.set_xlabel("Action")
+        ax.set_ylabel("Q-value")
+        ax.set_ylim([min(q_values) - 2, max(q_values) + 2])
+
+plt.tight_layout()
+plt.savefig("output/Data_q_values_by_position.png", dpi=100)
+plt.close()
+
 # Graph Test Data
 print("Generating Test Data Charts...")
 df = pd.read_csv("output/WhompStomp_Test_Data.csv")
@@ -205,4 +231,57 @@ plt.ylim([0, 100])
 plt.savefig("output/Data_win_rate.png")
 plt.close()
 
+print("\n" + "="*50)
+print("PERFORMANCE STATISTICS")
+print("="*50)
+
+# Win rates
+win_rate_p1 = (df["Win"] == 1).sum() / len(df) * 100
+print(f"\nWin Rate P1 (Agent): {win_rate_p1:.2f}%")
+
+# Calculate win rates for other players
+df['P2_Win'] = (df['p2score'] == df[['p1score', 'p2score', 'p3score', 'p4score']].max(axis=1)).astype(int)
+df['P3_Win'] = (df['p3score'] == df[['p1score', 'p2score', 'p3score', 'p4score']].max(axis=1)).astype(int)
+df['P4_Win'] = (df['p4score'] == df[['p1score', 'p2score', 'p3score', 'p4score']].max(axis=1)).astype(int)
+
+win_rate_p2 = (df['P2_Win'] == 1).sum() / len(df) * 100
+win_rate_p3 = (df['P3_Win'] == 1).sum() / len(df) * 100
+win_rate_p4 = (df['P4_Win'] == 1).sum() / len(df) * 100
+
+print(f"Win Rate P2 (Always 0): {win_rate_p2:.2f}%")
+print(f"Win Rate P3 (Always 1): {win_rate_p3:.2f}%")
+print(f"Win Rate P4 (Random): {win_rate_p4:.2f}%")
+
+# Score statistics
+print("\n" + "="*50)
+print("SCORE STATISTICS")
+print("="*50)
+print("\n=== MEAN SCORES ===")
+print(f"P1 (Agent): {df['p1score'].mean():.3f}")
+print(f"P2 (Always 0): {df['p2score'].mean():.3f}")
+print(f"P3 (Always 1): {df['p3score'].mean():.3f}")
+print(f"P4 (Random): {df['p4score'].mean():.3f}")
+
+print("\n=== STANDARD DEVIATIONS ===")
+print(f"P1 (Agent): {df['p1score'].std():.6f}")
+print(f"P2 (Always 0): {df['p2score'].std():.6f}")
+print(f"P3 (Always 1): {df['p3score'].std():.6f}")
+print(f"P4 (Random): {df['p4score'].std():.6f}")
+
+# Statistical test: One-way ANOVA
+from scipy import stats
+
+f_stat, p_value = stats.f_oneway(df['p1score'], df['p2score'], df['p3score'], df['p4score'])
+print("\n=== ANOVA: AGENT VS ALL PLAYERS ===")
+print(f"F-statistic: {f_stat:.10f}")
+print(f"p-value: {p_value:.2e}")
+
+# T-test: Agent vs Average of opponents
+opponent_avg = (df['p2score'] + df['p3score'] + df['p4score']) / 3
+t_stat, t_pvalue = stats.ttest_ind(df['p1score'], opponent_avg)
+print("\n=== T-TEST: AGENT VS OPPONENT AVERAGE ===")
+print(f"t-statistic: {t_stat:.6f}")
+print(f"p-value: {t_pvalue:.6e}")
+
+print("\n" + "="*50)
 print("Data analysis complete! Charts saved to output/")
