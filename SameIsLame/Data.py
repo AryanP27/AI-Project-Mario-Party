@@ -193,7 +193,7 @@ for col in ["Turns"]:
 
     plt.xlabel("Episode")
     plt.ylabel(col)
-    plt.title("Training Results Over Episodes")
+    plt.title("Testing Results") # SHOULD BE TESTING, THIS TYPO IS IN MY SLIDES
     plt.savefig(f"output/Data_Episode_{col}.png")
     plt.close()
 
@@ -207,7 +207,7 @@ for col in ["Reward"]:
 
     plt.xlabel("Episode")
     plt.ylabel(col)
-    plt.title("Training Results Over Episodes")
+    plt.title("Testing Results") # SHOULD BE TESTING, THIS TYPO IS IN MY SLIDES
     plt.savefig(f"output/Data_training_{col}.png")
     plt.close()
 
